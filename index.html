@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Orynex: flood-risk-informed planting calendar prototype for smallholder rice farmers in the Tamiang floodplain, Aceh.">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Orynex Planting Advisor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: field-office console. Top bar, then a two-column workbench (controls + verdict | charts), then river status and farmer message. */
+:root{
+  --bg:#F2F4EC; --surface:#FFFFFF; --ink:#1B2A21; --muted:#5D6B61; --line:#D6DCCF;
+  --paddy:#3E7B38; --paddy-soft:#E1EDD9; --flood:#2D6A9C; --flood-soft:#DCE8F2;
+  --warn:#C8820F; --warn-soft:#FBEFD6; --crit:#B23A2D; --crit-soft:#F7DEDA;
+  --st-nur:#C7E3BC; --st-veg:#6FB466; --st-rep:#EE8A3C; --st-rip:#E9C23F;
+  --wa-bg:#E9E1D4; --wa-out:#D8F5C9; --wa-in:#FFFFFF;
+  --f-display:"Bitter", Georgia, "Times New Roman", serif;
+  --f-body:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101612; --surface:#18201A; --ink:#E4EBE1; --muted:#98A69B; --line:#2B362E;
+  --paddy:#7FBF70; --paddy-soft:#1F3220; --flood:#6EA6D8; --flood-soft:#18293A;
+  --warn:#E5AA45; --warn-soft:#3A2D12; --crit:#E46D5F; --crit-soft:#3C1E1A;
+  --st-nur:#3D5E36; --st-veg:#5C9F55; --st-rep:#D2763A; --st-rip:#C9A63A;
+  --wa-bg:#1C2420; --wa-out:#22412E; --wa-in:#26302A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101612; --surface:#18201A; --ink:#E4EBE1; --muted:#98A69B; --line:#2B362E;
+  --paddy:#7FBF70; --paddy-soft:#1F3220; --flood:#6EA6D8; --flood-soft:#18293A;
+  --warn:#E5AA45; --warn-soft:#3A2D12; --crit:#E46D5F; --crit-soft:#3C1E1A;
+  --st-nur:#3D5E36; --st-veg:#5C9F55; --st-rep:#D2763A; --st-rip:#C9A63A;
+  --wa-bg:#1C2420; --wa-out:#22412E; --wa-in:#26302A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:20px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:22px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:30px;margin:0;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--muted)}
+.tag{font-family:var(--f-data);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:3px 7px}
+h2{font-family:var(--f-display);font-weight:600;font-size:19px;margin:0;text-wrap:balance}
+.lbl{font-family:var(--f-data);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bench{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px}
+@media (max-width:860px){.bench{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px;display:grid;gap:14px;min-width:0}
+.ctrl{display:grid;gap:6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 10px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--paddy)}
+.datebig{font-family:var(--f-display);font-size:22px;font-weight:600}
+.verdict{border-radius:8px;padding:14px;display:grid;gap:6px;border:1px solid var(--line)}
+.verdict.ok{background:var(--paddy-soft)} .verdict.mid{background:var(--warn-soft)} .verdict.bad{background:var(--crit-soft)}
+.big{font-family:var(--f-data);font-size:44px;line-height:1;font-weight:500;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-family:var(--f-data);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;color:#fff;width:max-content}
+.chip.ok{background:var(--paddy)} .chip.mid{background:var(--warn)} .chip.bad{background:var(--crit)}
+:root .chip{color:var(--surface)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--f-data);font-variant-numeric:tabular-nums}
+.chart{width:100%;height:auto;display:block}
+.chart text{font-family:var(--f-data);font-size:10.5px;fill:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:5px}
+.reco{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.crop{border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:4px}
+.crop b{font-family:var(--f-display);font-size:17px}
+.row2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px}
+@media (max-width:860px){.row2{grid-template-columns:1fr}}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.phone{background:var(--wa-bg);border-radius:14px;padding:14px;display:grid;gap:10px;align-content:start}
+.wahead{display:flex;align-items:center;gap:10px;font-size:13px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--paddy);color:var(--surface);display:grid;place-items:center;font-family:var(--f-display);font-weight:700}
+.bubble{background:var(--wa-in);border-radius:10px;padding:10px 12px;font-size:14px;max-width:92%;white-space:pre-line;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.bubble small{display:block;text-align:right;color:var(--muted);font-family:var(--f-data);font-size:10.5px;margin-top:4px}
+.note{font-size:12.5px;color:var(--muted);max-width:75ch}
+.compare{width:100%;border-collapse:collapse;font-size:13.5px}
+.compare th,.compare td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.compare td.n{font-family:var(--f-data);text-align:right;font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+<header>
+  <div class="brand">
+    <h1>Orynex</h1>
+    <p>Flood-risk-informed planting calendar · Tamiang floodplain, Aceh Tamiang</p>
+  </div>
+  <span class="tag">Prototype v0.1 · Vocational Championship 2026</span>
+</header>
+
+<section class="bench">
+  <div class="panel" aria-label="Field settings">
+    <div class="ctrl">
+      <span class="lbl">Sowing date (seedbed)</span>
+      <div class="datebig" id="sowLabel">1 Oct</div>
+      <input type="range" id="sow" min="1" max="365" value="274" aria-label="Sowing date, day of year">
+    </div>
+    <div class="ctrl">
+      <span class="lbl">Variety</span>
+      <div class="seg" id="segVar">
+        <button type="button" id="v-conv" data-v="conv" aria-pressed="true">Ciherang (conventional)</button>
+        <button type="button" id="v-sub1" data-v="sub1" aria-pressed="false">Inpari 30 Sub1</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <span class="lbl">Upstream land cover (HEC-HMS scenario)</span>
+      <div class="seg" id="segLc">
+        <button type="button" id="lc-e" data-lc="Existing" aria-pressed="true">Existing</button>
+        <button type="button" id="lc-1" data-lc="S1" aria-pressed="false">S1 forest upstream</button>
+        <button type="button" id="lc-2" data-lc="S2" aria-pressed="false">S2 degraded</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <span class="lbl">Field flood exposure</span>
+      <div class="seg" id="segZone">
+        <button type="button" id="z-h" data-phi="0.35" aria-pressed="true">Floodplain</button>
+        <button type="button" id="z-m" data-phi="0.20" aria-pressed="false">Transition</button>
+        <button type="button" id="z-l" data-phi="0.08" aria-pressed="false">Upland terrace</button>
+      </div>
+    </div>
+    <div class="verdict" id="verdict">
+      <span class="lbl">Expected yield loss from floods</span>
+      <div class="big" id="lossBig">21.5%</div>
+      <span class="chip" id="chip">High risk</span>
+      <dl class="kv">
+        <dt>Transplant</dt><dd id="kTp">–</dd>
+        <dt>Flowering</dt><dd id="kFl">–</dd>
+        <dt>Harvest</dt><dd id="kHv">–</dd>
+        <dt>Loss value</dt><dd id="kRp">–</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="panel" aria-label="Risk by sowing date">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+      <h2>Expected loss for every sowing date</h2>
+      <span class="lbl" id="winLbl">Low-risk window –</span>
+    </div>
+    <svg class="chart" id="lossChart" viewBox="0 0 760 340" role="img" aria-label="Expected yield loss by sowing date with flood hazard and crop stages"></svg>
+    <div class="legend">
+      <span><i style="background:var(--flood-soft);border:1px solid var(--flood)"></i>Flood hazard (9 events, 2021–2026)</span>
+      <span><i style="background:var(--paddy-soft);border:1px solid var(--paddy)"></i>Low-risk window (loss ≤ 2%)</span>
+      <span><i style="background:var(--st-nur)"></i>Nursery</span>
+      <span><i style="background:var(--st-veg)"></i>Vegetative</span>
+      <span><i style="background:var(--st-rep)"></i>Reproductive</span>
+      <span><i style="background:var(--st-rip)"></i>Ripening</span>
+    </div>
+    <div>
+      <span class="lbl">Orynex recommended double-cropping calendar</span>
+      <div class="reco" id="reco" style="margin-top:8px"></div>
+    </div>
+    <div class="tbl">
+      <table class="compare" id="compare"></table>
+    </div>
+  </div>
+</section>
+
+<section class="row2">
+  <div class="panel" aria-label="River status">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+      <h2>Tamiang River at the outlet</h2>
+      <span class="lbl">HEC-HMS · Senyar storm, 397.4 mm</span>
+    </div>
+    <div class="ctrl">
+      <span class="lbl">Hours since rain onset: <b id="hrLbl" style="color:var(--ink)">8 h</b></span>
+      <input type="range" id="hr" min="0" max="48" value="8" aria-label="Hours since rain onset">
+    </div>
+    <div class="status">
+      <span class="chip" id="rchip">Standby</span>
+      <span class="big" style="font-size:28px" id="qnow">–</span>
+      <span class="note" id="rnote"></span>
+    </div>
+    <svg class="chart" id="hydChart" viewBox="0 0 760 260" role="img" aria-label="Outlet hydrograph with warning thresholds"></svg>
+  </div>
+
+  <div class="phone" aria-label="Farmer message preview">
+    <div class="wahead"><div class="avatar">O</div><div><b>Orynex · Kelompok Tani</b><br><span class="lbl">WhatsApp preview</span></div></div>
+    <div class="bubble" id="msg1"></div>
+    <div class="bubble" id="msg2" hidden></div>
+  </div>
+</section>
+
+<p class="note">Prototype built on the model in the Orynex paper: HEC-HMS hydrographs for 11 sub-basins, a von Mises seasonal hazard from nine documented floods (Jan 2021–Oct 2026), logistic stage-vulnerability functions and a two-crop optimiser. Figures are indicative and do not replace BMKG or BPBD warnings. Loss value uses 5.9 t/ha and Rp6,500/kg GKP.</p>
+</div>
+
+<script>
+const DATA = {"H":[0.016986,0.017129,0.017248,0.017343,0.017413,0.017456,0.017472,0.017462,0.017423,0.017357,0.017263,0.017142,0.016992,0.016816,0.016614,0.016386,0.016134,0.015857,0.015559,0.015239,0.014899,0.01454,0.014165,0.013775,0.013371,0.012955,0.012529,0.012095,0.011655,0.01121,0.010762,0.010313,0.009864,0.009417,0.008974,0.008537,0.008105,0.007682,0.007267,0.006863,0.006469,0.006088,0.005719,0.005363,0.005021,0.004692,0.004379,0.004079,0.003795,0.003525,0.00327,0.003029,0.002802,0.002589,0.002389,0.002203,0.002029,0.001868,0.001718,0.00158,0.001452,0.001334,0.001225,0.001126,0.001035,0.000951,0.000876,0.000807,0.000744,0.000687,0.000636,0.00059,0.000548,0.00051,0.000477,0.000446,0.000419,0.000395,0.000374,0.000355,0.000338,0.000322,0.000309,0.000297,0.000287,0.000277,0.000269,0.000262,0.000256,0.00025,0.000245,0.000241,0.000237,0.000234,0.000231,0.000229,0.000226,0.000225,0.000223,0.000221,0.00022,0.000219,0.000218,0.000217,0.000217,0.000216,0.000216,0.000215,0.000215,0.000214,0.000214,0.000214,0.000214,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000212,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000213,0.000214,0.000214,0.000214,0.000215,0.000215,0.000215,0.000216,0.000216,0.000217,0.000218,0.000219,0.00022,0.000221,0.000222,0.000223,0.000225,0.000227,0.000229,0.000232,0.000234,0.000238,0.000241,0.000245,0.00025,0.000255,0.000261,0.000267,0.000275,0.000283,0.000292,0.000302,0.000314,0.000327,0.000341,0.000357,0.000374,0.000393,0.000415,0.000438,0.000464,0.000492,0.000523,0.000557,0.000594,0.000634,0.000677,0.000724,0.000774,0.000829,0.000888,0.00095,0.001018,0.001089,0.001165,0.001246,0.001332,0.001423,0.001518,0.001618,0.001723,0.001833,0.001947,0.002066,0.002189,0.002316,0.002447,0.002582,0.00272,0.002861,0.003005,0.003152,0.0033,0.003449,0.0036,0.003752,0.003903,0.004055,0.004206,0.004355,0.004503,0.004649,0.004793,0.004933,0.005071,0.005205,0.005335,0.005461,0.005582,0.005699,0.005811,0.005917,0.006019,0.006116,0.006207,0.006293,0.006374,0.006449,0.00652,0.006585,0.006646,0.006702,0.006754,0.006801,0.006845,0.006885,0.006921,0.006955,0.006985,0.007014,0.00704,0.007065,0.007089,0.007112,0.007134,0.007157,0.00718,0.007204,0.00723,0.007258,0.007289,0.007322,0.007359,0.0074,0.007446,0.007498,0.007555,0.007618,0.007689,0.007767,0.007853,0.007948,0.008051,0.008165,0.008288,0.008422,0.008567,0.008723,0.008891,0.00907,0.009261,0.009464,0.009679,0.009905,0.010143,0.010391,0.01065,0.01092,0.011198,0.011485,0.011779,0.012081,0.012387,0.012698,0.013012,0.013327,0.013642,0.013955,0.014265,0.014571,0.01487,0.01516,0.015441,0.015709,0.015965,0.016205,0.016429,0.016635,0.016821],"Q":{"Existing":[1.1,1.1,7.8,92.0,1242.7,3964.1,7957.7,13080.6,18392.6,22676.7,25503.4,26836.6,26435.7,24973.9,22744.9,20038.1,17459.2,16002.4,14820.4,13975.6,13390.9,12864.1,12310.3,11758.7,11278.6,10750.7,10247.5,9767.9,9310.7,8874.9,8459.5,8063.5,7686.1,7326.4,6983.5,6656.6,6345.0,6048.1,5765.0,5495.1,5237.9,4992.8,4759.1,4536.3,4324.0,4121.6,3928.7,3744.8,3569.5],"S1":[1.1,14.9,153.4,713.4,3915.1,10599.6,18706.4,25721.1,30488.4,32510.6,32607.7,31085.4,29118.1,26543.9,23970.1,21510.4,19177.7,17730.5,16714.7,16085.8,15549.9,15027.1,14553.9,14138.8,13736.3,13261.0,12802.2,12359.2,11931.5,11518.7,11120.1,10735.4,10363.9,10005.3,9659.1,9324.9,9002.2,8690.8,8390.1,8099.7,7819.5,7548.9,7287.7,7035.6,6792.1,6557.1,6330.2,6111.2,5899.7],"S2":[1.1,2.9,87.7,531.0,3807.4,10232.9,18781.0,28277.7,35622.2,39526.1,39474.4,36565.6,31232.2,26090.9,24071.0,22401.1,20966.3,20104.2,19228.0,18347.6,17563.2,17005.0,16501.6,16006.1,15516.5,14957.8,14419.1,13899.9,13399.4,12916.9,12451.8,12003.4,11571.2,11154.5,10752.8,10365.6,9992.4,9632.5,9285.7,8951.3,8629.0,8318.3,8018.7,7730.0,7451.6,7183.3,6924.6,6675.3,6434.9]},"thr":{"Alert":6709.15,"Standby":13418.3,"Warning":20127.449999999997},"hyd":{"Existing":{"Qp":26836.6,"tp":11.0,"t_Alert":5.687362279647436,"t_Standby":7.063573042168675,"t_Warning":8.40495086482575,"dur_Standby":12.88956531938426},"S1":{"Qp":32607.7,"tp":10.0,"t_Alert":4.417989378412746,"t_Standby":5.347695761582869,"t_Warning":6.202581721242533,"dur_Standby":19.32136682565444},"S2":{"Qp":39526.1,"tp":9.0,"t_Alert":4.45159909734651,"t_Standby":5.372644213333957,"t_Warning":6.141780829130118,"dur_Standby":22.58958351704682}},"mult":{"Existing":1.0,"S1":1.4989928943994388,"S2":1.7525481237970817},"events":[["2021-01-19","Viva (2021)","1,562 displaced; 3 sub-districts"],["2021-12-31","ANTARA (2022)","9,459 displaced"],["2022-11-02","ANTARA Jatim (2022)","23,380 displaced; 12 sub-districts"],["2023-01-21","ANTARA Aceh (2023)","3,112 displaced; 8 sub-districts"],["2023-12-25","Medcom (2023)","726 displaced; 3 sub-districts"],["2025-01-15","Metro TV (2025)","water up to 1.2 m; 5 sub-districts"],["2025-11-26","TDMRC USK (2025)","Cyclone Senyar; 397.4 mm/24 h"],["2026-01-01","Metro TV (2026)","embankment breach, Bendahara"],["2026-10-11","ANTARA (2026a)","18 villages; 9 sub-districts"]],"check":{"curI":0.21454152413946748,"opt":{"loss":0.015535692953044355,"sow":[47,147]}}};
+const H = DATA.H, DUR = 111, NURS = 21;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const BLN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+const MSTART = [1,32,60,91,121,152,182,213,244,274,305,335];
+const VP = {veg:{conv:[6.79,2.62],sub1:[19.1,4.65]}, rep:[2.8,1.6], rip:[7.72,2.69]};
+const DG = Array.from({length:45},(_,i)=>3+11*i/44);
+const tri = x => x<7 ? 2*(x-3)/(11*4) : 2*(14-x)/(11*7);
+const DWr = DG.map(tri); const DWs = DWr.reduce((a,b)=>a+b,0); const DW = DWr.map(w=>w/DWs);
+const logi = (D,[d50,s]) => 1/(1+Math.exp(-(D-d50)/s));
+function vexp(stage, v, mult){
+  let t=0;
+  DG.forEach((D,i)=>{const d=D*mult; let x;
+    if(stage===0) x = d>=2?0.10:0;
+    else if(stage===1) x = logi(d,VP.veg[v]);
+    else if(stage===2) x = logi(d,VP.rep);
+    else x = logi(d,VP.rip);
+    t += DW[i]*x;});
+  return t;
+}
+const stageOf = a => a<21?0:a<46?1:a<81?2:3;
+function curve(v, mult, phi){
+  const vs=[0,1,2,3].map(k=>vexp(k,v,mult));
+  const out=new Float64Array(365);
+  for(let s=1;s<=365;s++){let surv=1;
+    for(let a=0;a<DUR;a++){const p=1-Math.exp(-H[(s-1+a)%365]*phi); surv*=1-p*vs[stageOf(a)];}
+    out[s-1]=1-surv;}
+  return out;
+}
+const fdate = d => {const t=new Date(Date.UTC(2027,0,1)+((d-1+365)%365)*864e5); return t.getUTCDate()+" "+MON[t.getUTCMonth()];};
+const fbln = d => {const t=new Date(Date.UTC(2027,0,1)+((d-1+365)%365)*864e5); return t.getUTCDate()+" "+BLN[t.getUTCMonth()];};
+const wrap = d => ((d-1)%365+365)%365+1;
+const tpMonth = s => new Date(Date.UTC(2027,0,1)+(wrap(s+NURS)-1)*864e5).getUTCMonth();
+function optimise(c){
+  let best=[9,null];
+  for(let s1=1;s1<=365;s1+=2) for(let k=100;k<266;k+=2){
+    const s2=wrap(s1+k);
+    const g12=((s2+NURS-(s1+DUR))%365+365)%365, g21=((s1+NURS-(s2+DUR))%365+365)%365;
+    if(g12<10||g21<10||g12+g21>186||tpMonth(s1)===1||tpMonth(s2)===1) continue;
+    const v=c[s1-1]+c[s2-1]; if(v<best[0]) best=[v,[s1,s2]];
+  }
+  return best;
+}
+function windowOf(c, tol=0.02){
+  let runs=[],st=null;
+  for(let d=1;d<=366;d++){const ok=d<=365&&c[d-1]<=tol;
+    if(ok&&st===null) st=d; if(!ok&&st!==null){runs.push([st,d-1]);st=null;}}
+  if(runs.length>1&&runs[0][0]===1&&runs[runs.length-1][1]===365){const l=runs.pop();runs[0]=[l[0],runs[0][1]];}
+  runs.sort((a,b)=>((b[1]-b[0]+365)%365)-((a[1]-a[0]+365)%365));
+  return runs[0]||null;
+}
+
+const S = {sow:274, v:"conv", lc:"Existing", phi:0.35, hr:8};
+let C=null, OPT=null;
+const $ = id => document.getElementById(id);
+const pct = (x,d=1) => (100*x).toFixed(d)+"%";
+const NS="http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); parent&&parent.appendChild(e); return e;}
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function recompute(){
+  C = curve(S.v, DATA.mult[S.lc], S.phi);
+  OPT = optimise(C);
+}
+function level(x){return x<=0.02?"ok":x<=0.08?"mid":"bad";}
+function renderVerdict(){
+  const x=C[S.sow-1], lv=level(x);
+  $("sowLabel").textContent=fdate(S.sow);
+  $("lossBig").textContent=pct(x);
+  $("verdict").className="verdict "+lv;
+  const chip=$("chip"); chip.className="chip "+lv; chip.textContent={ok:"Low risk",mid:"Moderate risk",bad:"High risk"}[lv];
+  $("kTp").textContent=fdate(S.sow+NURS);
+  $("kFl").textContent=fdate(S.sow+70)+" – "+fdate(S.sow+81);
+  $("kHv").textContent=fdate(S.sow+DUR);
+  $("kRp").textContent="Rp"+(x*5.9*6.5).toFixed(2)+" million/ha";
+}
+function renderLoss(){
+  const svg=$("lossChart"); svg.innerHTML="";
+  const L=46,R=748,T=12,B=236, W=R-L, Hh=B-T, ymax=0.36;
+  const X=d=>L+(d-1)/364*W, Y=v=>B-v/ymax*Hh;
+  const hmax=Math.max(...H);
+  // hazard band
+  let pth=`M${X(1)},${B}`; for(let d=1;d<=365;d++) pth+=` L${X(d)},${B-H[d-1]/hmax*Hh*0.55}`; pth+=` L${X(365)},${B} Z`;
+  el("path",{d:pth,fill:css("--flood-soft"),stroke:"none"},svg);
+  // window
+  const w=windowOf(C);
+  if(w){const segs=w[0]<=w[1]?[[w[0],w[1]]]:[[w[0],365],[1,w[1]]];
+    segs.forEach(([a,b])=>el("rect",{x:X(a),y:T,width:Math.max(1,X(b)-X(a)),height:Hh,fill:css("--paddy-soft"),opacity:0.85},svg));
+    $("winLbl").textContent="Low-risk window "+fdate(w[0])+" – "+fdate(w[1]);
+  } else $("winLbl").textContent="No date reaches loss ≤ 2%";
+  // grid
+  [0,0.1,0.2,0.3].forEach(v=>{el("line",{x1:L,x2:R,y1:Y(v),y2:Y(v),stroke:css("--line"),"stroke-width":1},svg);
+    const t=el("text",{x:L-6,y:Y(v)+3.5,"text-anchor":"end"},svg); t.textContent=(v*100)+"%";});
+  MSTART.forEach((d,i)=>{const t=el("text",{x:X(d)+3,y:B+14},svg); t.textContent=MON[i];
+    el("line",{x1:X(d),x2:X(d),y1:B,y2:B+4,stroke:css("--muted")},svg);});
+  // curve
+  let p=""; for(let d=1;d<=365;d++) p+=(d===1?"M":"L")+X(d)+","+Y(Math.min(C[d-1],ymax));
+  el("path",{d:p,fill:"none",stroke:css("--ink"),"stroke-width":2},svg);
+  // optimum markers
+  if(OPT[1]) OPT[1].forEach(s=>el("circle",{cx:X(s),cy:Y(C[s-1]),r:4.5,fill:css("--paddy"),stroke:css("--surface"),"stroke-width":1.5},svg));
+  // selected
+  el("line",{x1:X(S.sow),x2:X(S.sow),y1:T,y2:B,stroke:css("--ink"),"stroke-dasharray":"3 3"},svg);
+  el("circle",{cx:X(S.sow),cy:Y(Math.min(C[S.sow-1],ymax)),r:6,fill:css({ok:"--paddy",mid:"--warn",bad:"--crit"}[level(C[S.sow-1])]),stroke:css("--surface"),"stroke-width":2},svg);
+  // phenology strip
+  const sy=B+36, sh=16; const lab=el("text",{x:L,y:sy-4},svg); lab.textContent="Crop stages for the selected sowing date";
+  el("rect",{x:L,y:sy,width:W,height:sh,fill:css("--bg"),stroke:css("--line")},svg);
+  const cols=["--st-nur","--st-veg","--st-rep","--st-rip"], bounds=[[0,21],[21,46],[46,81],[81,111]];
+  bounds.forEach(([a,b],k)=>{let s=S.sow+a, e=S.sow+b; const parts=[];
+    if(e<=366) parts.push([s,e]); else if(s>365) parts.push([s-365,e-365]); else {parts.push([s,366]);parts.push([1,e-365]);}
+    parts.forEach(([u,v])=>el("rect",{x:X(Math.min(u,365)),y:sy,width:Math.max(1,X(Math.min(v,366))-X(Math.min(u,365))),height:sh,fill:css(cols[k])},svg));});
+  // hazard rug
+  DATA.events.forEach(ev=>{const dd=new Date(ev[0]+"T00:00:00Z"); const doy=Math.round((dd-Date.UTC(dd.getUTCFullYear(),0,1))/864e5)+1;
+    el("line",{x1:X(doy),x2:X(doy),y1:sy+sh+4,y2:sy+sh+14,stroke:css("--flood"),"stroke-width":2},svg);});
+  const t2=el("text",{x:L,y:sy+sh+28},svg); t2.textContent="Ticks: documented floods 2021–2026 (Oct–Jan cluster)";
+}
+function renderReco(){
+  const box=$("reco"); box.innerHTML="";
+  if(!OPT[1]){box.textContent="No feasible two-crop calendar under these settings.";return;}
+  OPT[1].slice().sort((a,b)=>a-b).forEach((s,i)=>{
+    const d=document.createElement("div"); d.className="crop";
+    d.innerHTML=`<span class="lbl">Crop ${i+1}</span><b>Sow ${fdate(s)}</b><span>Transplant ${fdate(s+NURS)} · Harvest ${fdate(s+DUR)}</span><span class="lbl">Expected loss ${pct(C[s-1])}</span>`;
+    box.appendChild(d);});
+  const cur=C[273]+C[90], ory=OPT[0];
+  const sub=curve("sub1",DATA.mult[S.lc],S.phi); const subcur=sub[273]+sub[90];
+  $("compare").innerHTML=`<thead><tr><th>Strategy (two crops per year)</th><th style="text-align:right">Annual loss</th><th style="text-align:right">vs current</th></tr></thead>
+  <tbody><tr><td>Current calendar: sow 1 Oct and 1 Apr</td><td class="n">${pct(cur)}</td><td class="n">–</td></tr>
+  <tr><td>Current calendar with Sub1 seed only</td><td class="n">${pct(subcur)}</td><td class="n">${pct(1-subcur/cur,0)} lower</td></tr>
+  <tr><td><b>Orynex calendar</b></td><td class="n"><b>${pct(ory,2)}</b></td><td class="n"><b>${pct(1-ory/cur,0)} lower</b></td></tr></tbody>`;
+}
+function qAt(h){const q=DATA.Q[S.lc]; const i=Math.floor(h), f=h-i; return i>=48?q[48]:q[i]+(q[i+1]-q[i])*f;}
+function renderHyd(){
+  const svg=$("hydChart"); svg.innerHTML="";
+  const L=56,R=748,T=10,B=228, W=R-L, Hh=B-T, ymax=42000;
+  const X=h=>L+h/48*W, Y=q=>B-q/ymax*Hh;
+  const thr=DATA.thr, names=[["Alert","--warn"],["Standby","--warn"],["Warning","--crit"]];
+  [0,10000,20000,30000,40000].forEach(v=>{el("line",{x1:L,x2:R,y1:Y(v),y2:Y(v),stroke:css("--line")},svg);
+    const t=el("text",{x:L-6,y:Y(v)+3.5,"text-anchor":"end"},svg); t.textContent=v.toLocaleString("en-US");});
+  [0,6,12,18,24,30,36,42,48].forEach(h=>{const t=el("text",{x:X(h),y:B+15,"text-anchor":"middle"},svg); t.textContent=h+" h";});
+  names.forEach(([n,c])=>{el("line",{x1:L,x2:R,y1:Y(thr[n]),y2:Y(thr[n]),stroke:css(c),"stroke-dasharray":"5 4"},svg);
+    const t=el("text",{x:R-4,y:Y(thr[n])-4,"text-anchor":"end"},svg); t.textContent=n+" "+Math.round(thr[n]).toLocaleString("en-US");});
+  ["Existing","S1","S2"].forEach(k=>{ if(k===S.lc) return; let p=""; DATA.Q[k].forEach((q,h)=>p+=(h?"L":"M")+X(h)+","+Y(q));
+    el("path",{d:p,fill:"none",stroke:css("--line"),"stroke-width":1.5},svg);});
+  let p=""; DATA.Q[S.lc].forEach((q,h)=>p+=(h?"L":"M")+X(h)+","+Y(q));
+  el("path",{d:p,fill:"none",stroke:css("--flood"),"stroke-width":2.5},svg);
+  el("line",{x1:X(S.hr),x2:X(S.hr),y1:T,y2:B,stroke:css("--ink"),"stroke-dasharray":"3 3"},svg);
+  const q=qAt(S.hr); el("circle",{cx:X(S.hr),cy:Y(q),r:5.5,fill:css("--flood"),stroke:css("--surface"),"stroke-width":2},svg);
+  $("hrLbl").textContent=S.hr+" h"; $("qnow").textContent=Math.round(q).toLocaleString("en-US")+" m³/s";
+  const hy=DATA.hyd[S.lc]; let st="Normal",cls="ok";
+  if(q>=thr.Warning){st="Warning";cls="bad";} else if(q>=thr.Standby){st="Standby";cls="mid";} else if(q>=thr.Alert){st="Alert";cls="mid";}
+  const rc=$("rchip"); rc.textContent=st; rc.className="chip "+cls;
+  const lead=hy.tp-S.hr;
+  $("rnote").textContent = lead>0 ? `Peak ${Math.round(hy.Qp).toLocaleString("en-US")} m³/s expected in ${lead.toFixed(0)} h. Standby lasts ${hy.dur_Standby.toFixed(1)} h in this scenario.` : `Past peak; river above Standby for ${hy.dur_Standby.toFixed(1)} h in total.`;
+  return st;
+}
+function renderMsg(st){
+  const x=C[S.sow-1], o=OPT[1]?OPT[1].slice().sort((a,b)=>a-b):null;
+  let m;
+  if(level(x)==="ok") m=`ORYNEX Kec. Bendahara\nTanggal semai ${fbln(S.sow)} termasuk AMAN dari musim banjir (perkiraan kehilangan ${pct(x)}).\nTanam pindah ${fbln(S.sow+NURS)}, perkiraan panen ${fbln(S.sow+DUR)}.\nInfo: PPL setempat.`;
+  else if(S.v==="conv") m=`ORYNEX Kec. Bendahara\nSemai ${fbln(S.sow)} berisiko tinggi: padi berbunga dan menguning saat musim banjir (perkiraan kehilangan ${pct(x)}).\n${o?`Anjuran: semai musim tanam 1 pada ${fbln(o[0])}, musim tanam 2 pada ${fbln(o[1])}.`:""}\nBila tetap tanam musim hujan, gunakan Inpari 30 Ciherang Sub1 dan semai paling lambat 1 September.`;
+  else m=`ORYNEX Kec. Bendahara\nInpari 30 Sub1 tahan terendam saat fase anakan, tetapi tidak saat berbunga. Semai ${fbln(S.sow)} masih berisiko (${pct(x)}).\n${o?`Jendela aman: semai ${fbln(o[0])} atau ${fbln(o[1])}.`:""}`;
+  $("msg1").innerHTML=""; $("msg1").append(m); const s1=document.createElement("small"); s1.textContent="07.30"; $("msg1").append(s1);
+  const m2=$("msg2");
+  if(st!=="Normal"){m2.hidden=false; m2.innerHTML="";
+    m2.append(`ORYNEX SIAGA PANEN\nSungai Tamiang status ${st.toUpperCase()}. Padi yang sudah menguning ≥85% segera dipanen dalam 48 jam. Hubungi ketua kelompok tani untuk jadwal combine.`);
+    const s2=document.createElement("small"); s2.textContent="0"+Math.min(9,Math.floor(S.hr/2)+5)+".10"; m2.append(s2);}
+  else m2.hidden=true;
+}
+function renderAll(full){ if(full) recompute(); renderVerdict(); renderLoss(); renderReco(); renderMsg(renderHyd()); }
+
+function bindSeg(id, key, attr, parse){
+  document.querySelectorAll("#"+id+" button").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll("#"+id+" button").forEach(x=>x.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true"); S[key]=parse(b.dataset[attr]); renderAll(true);}));
+}
+bindSeg("segVar","v","v",x=>x); bindSeg("segLc","lc","lc",x=>x); bindSeg("segZone","phi","phi",parseFloat);
+$("sow").addEventListener("input",e=>{S.sow=+e.target.value; renderVerdict(); renderLoss(); renderMsg(renderHyd());});
+$("hr").addEventListener("input",e=>{S.hr=+e.target.value; renderMsg(renderHyd());});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll(false));
+new MutationObserver(()=>renderAll(false)).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+renderAll(true);
+</script>
+
+</body>
+</html>
